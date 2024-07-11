@@ -1,0 +1,93 @@
+---
+title: "NSDC ML"
+author: "Khang Thai"
+date: "2024-05-20"
+output: html_document
+---
+
+```{r}
+library("tidyverse")
+library("caret")
+library("randomForest")
+
+data <- read.csv("host.csv")
+```
+
+```{r}
+data <- data %>%
+  select(host_is_superhost, host_response_rate, host_acceptance_rate, host_has_profile_pic, host_identity_verified, ratings, days_since_host, host_response_time_within_an_hour) %>%
+  na.omit()
+
+data$host_is_superhost <- as.factor(data$host_is_superhost)
+
+set.seed(123)
+trainIndex <- createDataPartition(data$host_is_superhost, p = 0.7, list = FALSE, times = 1)
+
+data_train <- data[trainIndex, ]
+data_test <- data[-trainIndex, ]
+
+model <- randomForest(host_is_superhost ~ ., data = data_train)
+
+```
+
+```{r}
+predictions <- predict(model, data_test)
+confusionMatrix(predictions, data_test$host_is_superhost)
+```
+Accuracy: 76.51%
+Sensitivity: 64.42% superhost correctly identified
+Specificity: 86.19% non-superhost correctly identified
+Balanced Accuracy: 75.30% 
+
+
+```{r}
+plot(model)
+
+importance(model)
+
+varImpPlot(model)
+```
+Rating shows most important variable when identifying a host becoming a superhost.
+
+
+Suggestions:
+1. Prioritize maintaining high ratings across different aspects
+2. Maintain high host_response_rate and host_acceptance_rate to show responsiveness and reliability.
+3. Have a profile picture to enhance trustworthiness.
+4. Get identity verified by Airbnb to increase credibility.
+5. Respond to guest inquiries within an hour to provide excellent customer service.
+
+
+
+
+```{r}
+param_grid <- expand.grid(
+  mtry = c(2, 3, 4, 5),
+  nodesize = c(1, 5, 10)
+)
+
+
+set.seed(123)
+tuned_model <- train(
+  host_is_superhost ~ .,
+  data = data_train,
+  method = "rf",
+  trControl = trainControl(method = "cv", number = 5),
+  tuneGrid = param_grid
+)
+
+best_param <- tuned_model$bestTune
+
+final_model <- randomForest(
+  host_is_superhost ~ .,
+  data = data_train,
+  mtry = best_params$mtry,
+  nodesize = best_params$nodesize
+)
+
+predictions_tuned <- predict(final_model, data_test)
+confusionMatrix(predictions_tuned, data_test$host_is_superhost)
+
+varImpPlot(final_model)
+```
+
